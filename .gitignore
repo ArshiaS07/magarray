@@ -1,0 +1,25 @@
+# Assistant files: local (README.md says how it was used).
+/CLAUDE.md
+/.claude/
+
+# Recordings made here are scratch; sessions live in mipe.
+/recordings/
+
+# Build trees
+/build/
+/cpp/build/
+compile_commands.json
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# IDEs and operating systems
+.idea/
+.vscode/
+.*.sw?
+.DS_Store

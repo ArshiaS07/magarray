@@ -1,0 +1,30 @@
+# Hygiene and formatting, run on every commit.
+#   pre-commit install        pre-commit run --all-files
+# Ruff runs through uv, so its version is the one pinned in python/uv.lock.
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-added-large-files
+        args: [--maxkb=256]
+      - id: check-case-conflict
+      - id: check-merge-conflict
+      - id: check-toml
+      - id: check-yaml
+      - id: end-of-file-fixer
+      - id: mixed-line-ending
+        args: [--fix=lf]
+      - id: trailing-whitespace
+
+  - repo: local
+    hooks:
+      - id: ruff-check
+        name: ruff check
+        entry: uv run --project python ruff check --fix
+        language: system
+        types_or: [python, pyi]
+      - id: ruff-format
+        name: ruff format
+        entry: uv run --project python ruff format
+        language: system
+        types_or: [python, pyi]
