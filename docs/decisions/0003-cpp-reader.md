@@ -1,6 +1,6 @@
 # 0003. The C++ reader: capsule's shape, when live operation needs it
 
-- Status: Accepted, not built (carried over from magnetometer-array's
+- Status: Accepted; built 2026-11-15 (carried over from magnetometer-array's
   ADR-0002 of 2026-10-28)
 - Date: 2026-11-15
 
@@ -15,9 +15,9 @@ pipeline decodes in Python and the estimator reads `session.h5`.
 
 ## Decision
 
-Build it when live operation is scheduled, not before, as a C++ library
-`magarray::` under `cpp/`, consumable by `add_subdirectory`, with the layers
-of the old ADR:
+A C++ library `magarray::` under `cpp/`, consumable by `add_subdirectory`,
+with the layers of the old ADR (built ahead of live operation since the
+captures to test it against were there):
 
 ```
 port → ByteSource → FrameParser → [EnvelopeDemux] → ScanDecoder → Board → drain(sink)
@@ -36,8 +36,11 @@ port → ByteSource → FrameParser → [EnvelopeDemux] → ScanDecoder → Boar
 
 ## Consequences
 
-Until then the Python decoder is the reference; the C++ one is tested
-against the same `tests/data` captures and must produce the same scans.
+The Python decoder stays the reference; the C++ one is tested against the
+same `tests/data` captures and produces the same scans (191 from the
+2026-10-28 cut, 0 from the floating line). `FrameParser` and `StreamDecoder`
+are pure; `Board` owns the thread and the queue; `open_serial` is the one
+platform piece (termios, an exclusive flock, DTR and RTS low).
 
 ## Would change this
 

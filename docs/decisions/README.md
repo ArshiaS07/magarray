@@ -9,4 +9,4 @@ what would make us revisit it. Rules about how we work are in
 |---|---|---|
 | 0001 | Scope: the board's host side, and nothing else | Accepted |
 | 0002 | One byte-stream recording format, with a header | Accepted |
-| 0003 | The C++ reader: capsule's shape, when live operation needs it | Accepted, not built |
+| 0003 | The C++ reader: capsule's shape | Accepted, built 2026-11-15 |

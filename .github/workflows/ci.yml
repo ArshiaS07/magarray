@@ -16,3 +16,12 @@ jobs:
       - run: uv run --project python ruff check python
       - run: uv run --project python ruff format --check python
       - run: uv run --project python pytest python/tests
+
+  cpp:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y libgtest-dev
+      - run: cmake -S cpp -B build -DCMAKE_BUILD_TYPE=Debug
+      - run: cmake --build build -j
+      - run: ctest --test-dir build --output-on-failure

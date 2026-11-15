@@ -11,9 +11,9 @@ and navigation live in [mipe](../mipe), which depends on this one.
 ```
 python/magarray/   wire (decoder), recording (.bsr read/write), source (port or replay, threaded),
                    monitor, view (Qt), cli
-python/tests/      with small captures under tests/data
-docs/              wire-protocol, recording-format, decisions
-cpp/               the C++ reader, when live operation needs it (decision 0003)
+python/tests/      with small captures under tests/data, shared with the C++ tests
+cpp/               the same in C++: wire, recording, Board (thread, queue, drain), replay; magarray_dump
+docs/              wire-protocol, recording-format, decisions, slides
 ```
 
 ## Use
@@ -36,12 +36,34 @@ it asks.
 Tests, from `python/`: `uv run pytest` (with `UV_PROJECT_ENVIRONMENT` as in
 `setup.sh`).
 
+## From C++
+
+```cmake
+add_subdirectory(<magarray>/cpp)          # or a submodule under external/
+target_link_libraries(app PRIVATE magarray::magarray)
+```
+
+```cpp
+magarray::BoardOptions o;                 // a reader thread, a bounded queue, reconnection
+o.open = [] { return magarray::open_serial("/dev/ttyUSB1"); };
+o.record = "session/raw/board0";          // tee every read to board0.bsr
+magarray::Board board(o);
+board.wait_for(100ms);
+board.drain([](const magarray::Scan& s) { /* raw counts, the board's ticks, the host's arrival */ });
+magarray::replay("board0.bsr", sink);     // the same decoder, the recorded arrivals
+```
+
+Build and test alone: `cmake -S cpp -B build/cpp && cmake --build build/cpp &&
+ctest --test-dir build/cpp` (GoogleTest from the system). Linux; the serial
+port is the one platform piece.
+
 ## Status
 
 - Wire protocol: measured on one board through the center board; the
   firmware's settings remain inferred (`docs/wire-protocol.md`).
 - Python decoder, recorder, replay, viewer: in use since October 2026.
-- C++ reader: planned (decision 0003), for live operation.
+- C++ library: decoder, recording, `Board`, replay, `magarray_dump`; tested on the
+  same captures as the Python decoder, scan for scan (decision 0003).
 
 ## History
 
