@@ -71,11 +71,11 @@
   \begin{center}
   \begin{tikzpicture}[node distance=4mm]
     \node[stage] (src) {port / recording};
-    \node[stage, right=of src] (dec) {FrameParser → StreamDecoder};
-    \node[stage, right=of dec] (board) {Board: thread, bounded queue};
+    \node[stage, right=of src] (dec) {decoder};
+    \node[stage, right=of dec] (board) {Board: thread + queue};
     \node[stage, right=of board] (drain) {drain(sink)};
     \draw[flow] (src) -- (dec); \draw[flow] (dec) -- (board); \draw[flow] (board) -- (drain);
-    \node[font=\scriptsize, text=ink2, below=2mm of dec] {pure: bytes in, scans out, counts of every failure};
+    \node[font=\scriptsize, text=ink2, below=2mm of dec] {pure: bytes in, scans out, every failure counted};
     \node[font=\scriptsize, text=ink2, below=2mm of drain] {the caller's thread, when it asks};
   \end{tikzpicture}
   \end{center}
