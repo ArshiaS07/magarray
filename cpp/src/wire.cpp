@@ -102,6 +102,7 @@ std::optional<Scan> decode_scan(const Frame& frame, std::optional<std::uint8_t> 
         s.field.push_back({v[0], v[1], v[2]});
         s.w.push_back(v[3]);
     }
+    s.repeated.assign(n, false);
     return s;
 }
 
@@ -166,6 +167,14 @@ void StreamDecoder::add(const Frame& frame, std::optional<std::uint8_t> channel,
     }
     ++stats_.scans;
     ++stats_.per_board[scan->key()];
+    auto& last = last_[scan->key()];
+    for (std::size_t k = 0; k < scan->sensor_ids.size(); ++k) {
+        const auto [it, first] = last.try_emplace(scan->sensor_ids[k], scan->field[k]);
+        if (!first) {
+            scan->repeated[k] = it->second == scan->field[k];
+            it->second = scan->field[k];
+        }
+    }
     out.push_back(std::move(*scan));
 }
 

@@ -76,8 +76,14 @@ One frame per scan: every sensor read once.
 - **Each sensor samples at about 40 Hz on its own oscillator** (38.7–41.4 Hz),
   so about half of all readings repeat the previous scan's values exactly; a
   chance repeat is about 10⁻⁶ per reading. A reading is the sensor's latest
-  sample, taken up to 25 ms before the scan. The decoder flags repeats
-  (`fresh`); **a consumer that does not drop them counts every sample twice.**
+  sample, taken up to 25 ms before the scan. The stream decoder marks repeats
+  per sensor (`Scan.repeated`, C++ and Python); **a consumer that does not
+  drop them counts every sample twice.**
+- **Noise:** `NoiseModel` (`noise.hpp`, `noise.py`) gives a new sample's
+  covariance per axis: the LIS3MDL datasheet's (3.2, 3.2 and 4.1 mgauss rms
+  in its ultra-high-performance mode) or a σ measured at rest, which on the
+  bench is about twice that (0.61 µT per axis, mipe's board fit). A repeat
+  is not a new sample and has no noise of its own.
 - **Latency:** a fresh reading describes the field about 37 ms before its
   arrival at the host (fit, two sessions: 36.7 and 37.2 ms), covering
   sampling, the board, the center board and USB, less the arm's own delay.

@@ -34,6 +34,13 @@ class Scan:
     field: np.ndarray  # int16 [n, 3], raw counts, sensor axes (lis3mdl.to_tesla: 14.6 nT per count at ±4 gauss)
     w: np.ndarray  # int16 [n], not interpreted (−0.107·x on this firmware)
     received: float = math.nan  # host time.monotonic() of the read that completed it
+    # bool [n]: the same counts as in this board's previous scan. The board reads every sensor each
+    # scan (12.5 ms), faster than an LIS3MDL updates its output (25 ms at 40 Hz), so about every
+    # other reading is the last sample again. Nothing on the wire says so; equal counts on all
+    # three axes do (a new sample equal to the last one by chance is about one in a few million at
+    # the board's noise). Set by StreamDecoder; empty for a scan made otherwise, all false from
+    # decode_scan.
+    repeated: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=bool))
 
     @property
     def key(self) -> tuple[int | None, int]:
@@ -124,6 +131,7 @@ def decode_scan(frame: Frame, channel: int | None, received: float = math.nan) -
         field=values[:, :3].astype(np.int16),
         w=values[:, 3].astype(np.int16),
         received=received,
+        repeated=np.zeros(len(ids), dtype=bool),
     )
 
 
@@ -157,6 +165,9 @@ class StreamDecoder:
         self._center = FrameParser(CENTER_SYNC)
         self._direct = FrameParser(BOARD_SYNC)
         self._inner: dict[int, FrameParser] = {}
+        # Each board's last counts, by sensor id: what marks a repeat. Kept across restart(): a
+        # sensor's registers hold their sample through a reconnect.
+        self._last: dict[tuple[int | None, int], dict[int, np.ndarray]] = {}
 
     @property
     def framing(self) -> str:
@@ -200,6 +211,12 @@ class StreamDecoder:
             return
         self.stats.scans += 1
         self.stats.per_board[scan.key] = self.stats.per_board.get(scan.key, 0) + 1
+        last = self._last.setdefault(scan.key, {})
+        for k, sid in enumerate(scan.sensor_ids.tolist()):
+            before = last.get(sid)
+            if before is not None:
+                scan.repeated[k] = bool(np.array_equal(before, scan.field[k]))
+            last[sid] = scan.field[k]
         out.append(scan)
 
     def _update_counters(self) -> None:

@@ -2,6 +2,7 @@
 #include <gtest/gtest.h>
 
 #include <cstring>
+#include <tuple>
 
 #include "magarray/wire.hpp"
 
@@ -128,6 +129,38 @@ TEST(StreamDecoder, AutoSettlesOnDirect) {
     const auto scans = d.feed(stream);
     EXPECT_EQ(d.framing(), Framing::direct);
     for (const Scan& s : scans) EXPECT_EQ(s.key(), (Scan::Key{std::nullopt, std::uint8_t{1}}));
+}
+
+TEST(StreamDecoder, MarksASensorWhoseCountsDidNotChangeAsRepeated) {
+    // Three scans of board 1: sensor 0 keeps its counts from the first to the second, sensor 1
+    // changes; then both change. Board 2's first scan, with the same counts, is no repeat.
+    auto payload = [](std::uint32_t ticks, std::int16_t s0, std::int16_t s1) {
+        auto p = scan_payload(ticks, 2);
+        std::memcpy(p.data() + 4 + 1, &s0, 2);
+        std::memcpy(p.data() + 4 + kRecordSize + 1, &s1, 2);
+        return p;
+    };
+    StreamDecoder dec(Framing::direct);
+    std::vector<std::byte> stream;
+    for (const auto& [ticks, s0, s1] :
+         std::vector<std::tuple<std::uint32_t, std::int16_t, std::int16_t>>{{0, 10, 20}, {12, 10, 21}, {24, 11, 22}}) {
+        const auto f = encode_frame(kBoardSync, kScanType, 1, payload(ticks, s0, s1));
+        stream.insert(stream.end(), f.begin(), f.end());
+    }
+    const auto other = encode_frame(kBoardSync, kScanType, 2, payload(0, 11, 22));
+    stream.insert(stream.end(), other.begin(), other.end());
+
+    const auto scans = dec.feed(stream);
+    ASSERT_EQ(scans.size(), 4u);
+    EXPECT_EQ(scans[0].repeated, (std::vector<bool>{false, false}));  // nothing before it
+    EXPECT_EQ(scans[1].repeated, (std::vector<bool>{true, false}));
+    EXPECT_EQ(scans[2].repeated, (std::vector<bool>{false, false}));
+    EXPECT_EQ(scans[3].repeated, (std::vector<bool>{false, false}));  // another board
+}
+
+TEST(Scan, DecodedAloneNothingIsRepeated) {
+    const auto frame = FrameParser(kBoardSync).feed(board_frame(0, 1, 3))[0];
+    EXPECT_EQ(decode_scan(frame, std::nullopt)->repeated, (std::vector<bool>{false, false, false}));
 }
 
 TEST(StreamDecoder, SeveralBoardsOnOnePort) {

@@ -8,6 +8,7 @@ from magarray.source import read_recording
 from magarray.wire import (
     BOARD_SYNC,
     CENTER_SYNC,
+    RECORD_SIZE,
     SCAN_TYPE,
     WRAPPED_TYPE,
     FrameParser,
@@ -107,6 +108,26 @@ class StreamDecoderTest(unittest.TestCase):
         d.feed(stream)
         self.assertEqual(sorted(d.stats.per_board), [(b, b) for b in range(4)])
 
+    def test_marks_a_sensor_whose_counts_did_not_change_as_repeated(self):
+        # Three scans of board 1: sensor 0 keeps its counts from the first to the second, sensor 1
+        # changes; then both change. Board 2's first scan, with the same counts, is no repeat.
+        def payload(ticks: int, s0: int, s1: int) -> bytes:
+            p = bytearray(scan_payload(ticks, n=2))
+            p[5:7] = struct.pack("<h", s0)
+            p[5 + RECORD_SIZE : 7 + RECORD_SIZE] = struct.pack("<h", s1)
+            return bytes(p)
+
+        board1 = [(0, 10, 20), (12, 10, 21), (24, 11, 22)]
+        stream = b"".join(encode_frame(BOARD_SYNC, SCAN_TYPE, 1, payload(t, a, b)) for t, a, b in board1)
+        stream += encode_frame(BOARD_SYNC, SCAN_TYPE, 2, payload(0, 11, 22))
+        scans = StreamDecoder("direct").feed(stream)
+        expected = [[False, False], [True, False], [False, False], [False, False]]
+        self.assertEqual([s.repeated.tolist() for s in scans], expected)
+
+    def test_decoded_alone_nothing_is_repeated(self):
+        frame = FrameParser(BOARD_SYNC).feed(board_frame(0, n=3))[0]
+        self.assertEqual(decode_scan(frame, None).repeated.tolist(), [False, False, False])
+
 
 class RecordingTest(unittest.TestCase):
     def test_bench_recording(self):  # the first 2 s of the 2026-10-28 capture, through the center board
@@ -117,6 +138,10 @@ class RecordingTest(unittest.TestCase):
         self.assertEqual(d.stats.checksum_errors, 0)
         self.assertEqual({s.key for s in scans}, {(2, 1)})
         self.assertEqual(set(np.diff([s.ticks for s in scans]).tolist()), {12})
+        # Read every 12.5 ms, updated every 25 ms: about every other reading repeats.
+        repeated = np.mean([s.repeated.mean() for s in scans[1:]])
+        self.assertGreater(repeated, 0.4)
+        self.assertLess(repeated, 0.6)
 
     def test_floating_line_gives_nothing(self):
         path = DATA / "floating-line_noise_10s.chunks"  # a lost link: junk, no frames

@@ -43,6 +43,13 @@ struct Scan {
     std::vector<std::uint8_t> sensor_ids;
     std::vector<std::array<std::int16_t, 3>> field;  ///< counts, sensor axes, per sensor
     std::vector<std::int16_t> w;                     ///< not interpreted
+    /// Per sensor: the same counts as in this board's previous scan. The board reads every sensor
+    /// each scan (12.5 ms), faster than an LIS3MDL updates its output (25 ms at 40 Hz), so about
+    /// every other reading is the last sample again, not a new one. Nothing on the wire says so;
+    /// equal counts on all three axes do (a new sample equal to the last one by chance is about one
+    /// in a few million at the board's noise, some 40 counts per axis). Set by StreamDecoder; all
+    /// false from decode_scan.
+    std::vector<bool> repeated;
 
     using Key = std::pair<std::optional<std::uint8_t>, std::uint8_t>;
     [[nodiscard]] Key key() const { return {channel, board_id}; }
@@ -123,6 +130,9 @@ private:
     FrameParser center_;
     FrameParser direct_;
     std::map<std::uint8_t, FrameParser> inner_;
+    /// Each board's last counts, per sensor id: what marks a repeat. Kept across restart(): a
+    /// sensor's registers hold their sample through a reconnect.
+    std::map<Scan::Key, std::map<std::uint8_t, std::array<std::int16_t, 3>>> last_;
 };
 
 }  // namespace magarray
